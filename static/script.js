@@ -473,9 +473,10 @@ function reproducirCancion(cancion, lista, indice) {
   listaReproduccion = lista || [cancion];
   indiceActual = typeof indice === 'number' ? indice : 0;
 
-  videoActualId = cancion.id;
+   videoActualId = cancion.id;
   vacio.style.display = 'none';
   reproductor.classList.remove('oculto');
+  document.body.classList.add('hay-reproduccion');
 
   carratula.src = cancion.miniatura;
   tituloCancion.textContent = cancion.titulo;
