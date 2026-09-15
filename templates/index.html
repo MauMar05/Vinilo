@@ -28,6 +28,20 @@
       <span>Vinilo</span>
     </div>
 
+    <div class="barra-cuenta">
+      {% if current_user.is_authenticated %}
+        <span>Hola, {{ current_user.nombre_usuario }}</span>
+        <a href="{{ url_for('logout') }}">Cerrar sesión</a>
+      {% else %}
+        <span>Tus favoritos e historial no se están guardando</span>
+        <span>
+          <a href="{{ url_for('login') }}">Iniciar sesión</a>
+          <span class="separador">·</span>
+          <a href="{{ url_for('registro') }}">Crear cuenta</a>
+        </span>
+      {% endif %}
+    </div>
+
     <form id="form-buscar" class="caja-buscar">
       <input
         type="text"
@@ -54,6 +68,13 @@
           <path d="M12 21s-6.7-4.35-9.3-8.1C1.1 10.5 1.6 7.3 4 5.6 6 4.2 8.6 4.6 10 6.3l2 2.4 2-2.4c1.4-1.7 4-2.1 6-.7 2.4 1.7 2.9 4.9 1.3 7.3C18.7 16.65 12 21 12 21z"/>
         </svg>
         Favoritos
+      </button>
+      <button type="button" class="pestana" data-pestana="historial">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px; margin-right:3px;">
+          <circle cx="12" cy="12" r="9"></circle>
+          <path d="M12 7v5l3 3"></path>
+        </svg>
+        Historial
       </button>
     </div>
 
@@ -127,6 +148,9 @@
 
 </div>
 
+<script>
+  window.USUARIO_AUTENTICADO = {{ 'true' if current_user.is_authenticated else 'false' }};
+</script>
 <script src="https://www.youtube.com/iframe_api"></script>
 <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>

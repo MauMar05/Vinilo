@@ -1,18 +1,28 @@
-// ---------- Estado ----------
+// ---------- Estado del reproductor de YouTube ----------
 let player = null;
 let playerListo = false;
 let videoActualId = null;
 let cancionPendiente = null;
 let intervaloProgreso = null;
 
-let listaReproduccion = [];   // el arreglo sobre el que navegan anterior/siguiente
-let indiceActual = -1;        // posición actual dentro de listaReproduccion
+let listaReproduccion = [];
+let indiceActual = -1;
 
-let resultadosBusqueda = [];  // últimos resultados de búsqueda
+let resultadosBusqueda = [];
 let pestanaActiva = 'resultados';
+
+// Cachés en memoria (se llenan desde el backend si hay sesión, o desde
+// localStorage si es invitado). Todo el renderizado lee de aquí, así que
+// no importa de dónde vinieron los datos.
+let favoritosCache = {};      // { id: cancion }
+let recientesCache = [];      // ['consulta1', 'consulta2', ...]
+let historialCache = [];      // [cancion, cancion, ...]
+
+const AUTENTICADO = window.USUARIO_AUTENTICADO === true;
 
 const CLAVE_FAVORITOS = 'vinilo_favoritos';
 const CLAVE_RECIENTES = 'vinilo_recientes';
+const CLAVE_HISTORIAL = 'vinilo_historial';
 
 const ICONO_CORAZON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-6.7-4.35-9.3-8.1C1.1 10.5 1.6 7.3 4 5.6 6 4.2 8.6 4.6 10 6.3l2 2.4 2-2.4c1.4-1.7 4-2.1 6-.7 2.4 1.7 2.9 4.9 1.3 7.3C18.7 16.65 12 21 12 21z"/></svg>`;
 
@@ -20,11 +30,7 @@ window.onYouTubeIframeAPIReady = function () {
   player = new YT.Player('yt-player', {
     height: '1',
     width: '1',
-    playerVars: {
-      autoplay: 0,
-      controls: 0,
-      disablekb: 1,
-    },
+    playerVars: { autoplay: 0, controls: 0, disablekb: 1 },
     events: {
       onReady: () => {
         playerListo = true;
@@ -67,8 +73,9 @@ const tiempoActual = $('#tiempo-actual');
 const tiempoTotal = $('#tiempo-total');
 const barraVolumen = $('#barra-volumen');
 
-// ---------- Favoritos (localStorage) ----------
-function cargarFavoritos() {
+// ==================== PERSISTENCIA: FAVORITOS ====================
+
+function cargarFavoritosLocal() {
   try {
     return JSON.parse(localStorage.getItem(CLAVE_FAVORITOS)) || {};
   } catch {
@@ -76,30 +83,57 @@ function cargarFavoritos() {
   }
 }
 
-function guardarFavoritos(favoritos) {
-  localStorage.setItem(CLAVE_FAVORITOS, JSON.stringify(favoritos));
+async function cargarFavoritosInicial() {
+  if (AUTENTICADO) {
+    try {
+      const resp = await fetch('/api/favoritos');
+      const datos = await resp.json();
+      favoritosCache = {};
+      (datos.favoritos || []).forEach((f) => { favoritosCache[f.id] = f; });
+    } catch {
+      favoritosCache = {};
+    }
+  } else {
+    favoritosCache = cargarFavoritosLocal();
+  }
 }
 
 function esFavorito(id) {
-  const favoritos = cargarFavoritos();
-  return Boolean(favoritos[id]);
+  return Boolean(favoritosCache[id]);
 }
 
-function alternarFavorito(cancion) {
-  const favoritos = cargarFavoritos();
-  if (favoritos[cancion.id]) {
-    delete favoritos[cancion.id];
+async function alternarFavorito(cancion) {
+  if (AUTENTICADO) {
+    try {
+      const resp = await fetch('/api/favoritos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cancion),
+      });
+      const datos = await resp.json();
+      if (datos.favorito) {
+        favoritosCache[cancion.id] = cancion;
+      } else {
+        delete favoritosCache[cancion.id];
+      }
+    } catch {
+      estadoBusqueda.textContent = 'No se pudo guardar el favorito. Revisa tu conexión.';
+      return;
+    }
   } else {
-    favoritos[cancion.id] = cancion;
+    const favoritos = cargarFavoritosLocal();
+    if (favoritos[cancion.id]) {
+      delete favoritos[cancion.id];
+    } else {
+      favoritos[cancion.id] = cancion;
+    }
+    localStorage.setItem(CLAVE_FAVORITOS, JSON.stringify(favoritos));
+    favoritosCache = favoritos;
   }
-  guardarFavoritos(favoritos);
 
   actualizarBotonFavoritoPrincipal();
   actualizarCorazonesEnLista();
-
-  if (pestanaActiva === 'favoritos') {
-    mostrarPestana('favoritos');
-  }
+  if (pestanaActiva === 'favoritos') mostrarPestana('favoritos');
 }
 
 function actualizarBotonFavoritoPrincipal() {
@@ -114,8 +148,9 @@ function actualizarCorazonesEnLista() {
   });
 }
 
-// ---------- Búsquedas recientes (localStorage) ----------
-function cargarRecientes() {
+// ==================== PERSISTENCIA: BÚSQUEDAS RECIENTES ====================
+
+function cargarRecientesLocal() {
   try {
     return JSON.parse(localStorage.getItem(CLAVE_RECIENTES)) || [];
   } catch {
@@ -123,18 +158,59 @@ function cargarRecientes() {
   }
 }
 
-function guardarReciente(query) {
-  let recientes = cargarRecientes().filter((q) => q.toLowerCase() !== query.toLowerCase());
-  recientes.unshift(query);
-  recientes = recientes.slice(0, 8);
-  localStorage.setItem(CLAVE_RECIENTES, JSON.stringify(recientes));
+async function cargarRecientesInicial() {
+  if (AUTENTICADO) {
+    try {
+      const resp = await fetch('/api/historial-busquedas');
+      const datos = await resp.json();
+      recientesCache = datos.busquedas || [];
+    } catch {
+      recientesCache = [];
+    }
+  } else {
+    recientesCache = cargarRecientesLocal();
+  }
+}
+
+async function guardarReciente(query) {
+  if (AUTENTICADO) {
+    try {
+      await fetch('/api/historial-busquedas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consulta: query }),
+      });
+      await cargarRecientesInicial();
+    } catch {
+      // si falla, simplemente no se guarda; no bloquea la búsqueda
+    }
+  } else {
+    let recientes = cargarRecientesLocal().filter((q) => q.toLowerCase() !== query.toLowerCase());
+    recientes.unshift(query);
+    recientes = recientes.slice(0, 8);
+    localStorage.setItem(CLAVE_RECIENTES, JSON.stringify(recientes));
+    recientesCache = recientes;
+  }
+  renderizarChipsRecientes();
+}
+
+async function borrarBusquedasRecientes() {
+  if (AUTENTICADO) {
+    try {
+      await fetch('/api/historial-busquedas', { method: 'DELETE' });
+    } catch {
+      /* no-op */
+    }
+  } else {
+    localStorage.removeItem(CLAVE_RECIENTES);
+  }
+  recientesCache = [];
   renderizarChipsRecientes();
 }
 
 function renderizarChipsRecientes() {
-  const recientes = cargarRecientes();
   chipsRecientes.innerHTML = '';
-  recientes.forEach((q) => {
+  recientesCache.forEach((q) => {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'chip-reciente';
@@ -146,20 +222,72 @@ function renderizarChipsRecientes() {
     chipsRecientes.appendChild(chip);
   });
 
-  if (recientes.length) {
+  if (recientesCache.length) {
     const btnBorrar = document.createElement('button');
     btnBorrar.type = 'button';
     btnBorrar.className = 'btn-borrar-historial';
     btnBorrar.textContent = 'Borrar historial';
-    btnBorrar.addEventListener('click', () => {
-      localStorage.removeItem(CLAVE_RECIENTES);
-      renderizarChipsRecientes();
-    });
+    btnBorrar.addEventListener('click', borrarBusquedasRecientes);
     chipsRecientes.appendChild(btnBorrar);
   }
 }
 
-// ---------- Pestañas: Resultados / Favoritos ----------
+// ==================== PERSISTENCIA: HISTORIAL DE REPRODUCCIÓN ====================
+
+function cargarHistorialLocal() {
+  try {
+    return JSON.parse(localStorage.getItem(CLAVE_HISTORIAL)) || [];
+  } catch {
+    return [];
+  }
+}
+
+async function cargarHistorialInicial() {
+  if (AUTENTICADO) {
+    try {
+      const resp = await fetch('/api/historial-reproduccion');
+      const datos = await resp.json();
+      historialCache = datos.reproducciones || [];
+    } catch {
+      historialCache = [];
+    }
+  } else {
+    historialCache = cargarHistorialLocal();
+  }
+}
+
+function registrarReproduccion(cancion) {
+  // No bloquea la reproducción: se guarda en segundo plano.
+  historialCache = [cancion, ...historialCache.filter((h) => h.id !== cancion.id)].slice(0, 30);
+  if (pestanaActiva === 'historial') renderizarLista(historialCache);
+
+  if (AUTENTICADO) {
+    fetch('/api/historial-reproduccion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cancion),
+    }).catch(() => {});
+  } else {
+    localStorage.setItem(CLAVE_HISTORIAL, JSON.stringify(historialCache));
+  }
+}
+
+async function vaciarHistorialReproduccion() {
+  if (AUTENTICADO) {
+    try {
+      await fetch('/api/historial-reproduccion', { method: 'DELETE' });
+    } catch {
+      /* no-op */
+    }
+  } else {
+    localStorage.removeItem(CLAVE_HISTORIAL);
+  }
+  historialCache = [];
+  mostrarPestana('historial');
+}
+
+// ==================== PESTAÑAS: Resultados / Favoritos / Historial ====================
+
 pestanas.forEach((btn) => {
   btn.addEventListener('click', () => mostrarPestana(btn.dataset.pestana));
 });
@@ -174,17 +302,34 @@ function mostrarPestana(nombre) {
     } else {
       listaResultados.innerHTML = '<li class="mensaje-lista-vacia">Busca algo para ver resultados.</li>';
     }
-  } else {
-    const favoritos = Object.values(cargarFavoritos());
+    return;
+  }
+
+  if (nombre === 'favoritos') {
+    const favoritos = Object.values(favoritosCache);
     if (favoritos.length) {
       renderizarLista(favoritos);
     } else {
       listaResultados.innerHTML = '<li class="mensaje-lista-vacia">Todavía no tienes canciones favoritas. Dale al corazón mientras escuchas algo.</li>';
     }
+    return;
+  }
+
+  // historial
+  if (historialCache.length) {
+    renderizarLista(historialCache);
+    const liAccion = document.createElement('li');
+    liAccion.className = 'mensaje-lista-vacia';
+    liAccion.innerHTML = '<button type="button" class="btn-borrar-historial">Vaciar historial</button>';
+    liAccion.querySelector('button').addEventListener('click', vaciarHistorialReproduccion);
+    listaResultados.appendChild(liAccion);
+  } else {
+    listaResultados.innerHTML = '<li class="mensaje-lista-vacia">Todavía no has escuchado nada.</li>';
   }
 }
 
-// ---------- Reproductor de YouTube (oculto, solo motor de audio) ----------
+// ==================== Reproductor de YouTube ====================
+
 function alOcurrirError(evento) {
   clearInterval(intervaloProgreso);
   mostrarIconoPlay();
@@ -218,7 +363,7 @@ function alCambiarEstado(evento) {
   }
   if (evento.data === YT.PlayerState.ENDED) {
     barraProgreso.value = 0;
-    avanzarSiguiente(true);
+    avanzarSiguiente();
   }
 }
 
@@ -255,7 +400,8 @@ function iniciarSeguimientoProgreso() {
   }, 500);
 }
 
-// ---------- Búsqueda ----------
+// ==================== Búsqueda ====================
+
 formBuscar.addEventListener('submit', async (e) => {
   e.preventDefault();
   const query = inputBuscar.value.trim();
@@ -272,7 +418,6 @@ formBuscar.addEventListener('submit', async (e) => {
       estadoBusqueda.textContent = 'No se pudo buscar. Intenta de nuevo.';
       return;
     }
-
     if (!datos.resultados.length) {
       estadoBusqueda.textContent = 'Sin resultados.';
       return;
@@ -316,7 +461,8 @@ function escaparHtml(texto) {
   return div.innerHTML;
 }
 
-// ---------- Reproducción ----------
+// ==================== Reproducción ====================
+
 function reproducirCancion(cancion, lista, indice) {
   if (!playerListo) {
     cancionPendiente = { cancion, lista, indice };
@@ -341,6 +487,7 @@ function reproducirCancion(cancion, lista, indice) {
   marcarActivoEnLista(cancion.id);
   actualizarBotonFavoritoPrincipal();
   actualizarBotonesNavegacion();
+  registrarReproduccion(cancion);
 
   player.loadVideoById(cancion.id);
   player.setVolume(Number(barraVolumen.value));
@@ -359,10 +506,8 @@ function actualizarBotonesNavegacion() {
   btnSiguiente.style.opacity = btnSiguiente.disabled ? 0.35 : 1;
 }
 
-function avanzarSiguiente(esAutomatico) {
-  if (indiceActual < 0 || indiceActual >= listaReproduccion.length - 1) {
-    return; // se acabó la lista, no hay más que reproducir
-  }
+function avanzarSiguiente() {
+  if (indiceActual < 0 || indiceActual >= listaReproduccion.length - 1) return;
   const nuevoIndice = indiceActual + 1;
   reproducirCancion(listaReproduccion[nuevoIndice], listaReproduccion, nuevoIndice);
 }
@@ -373,7 +518,8 @@ function retrocederAnterior() {
   reproducirCancion(listaReproduccion[nuevoIndice], listaReproduccion, nuevoIndice);
 }
 
-// ---------- Controles ----------
+// ==================== Controles ====================
+
 btnPlay.addEventListener('click', () => {
   if (!player) return;
   const estado = player.getPlayerState();
@@ -384,7 +530,7 @@ btnPlay.addEventListener('click', () => {
   }
 });
 
-btnSiguiente.addEventListener('click', () => avanzarSiguiente(false));
+btnSiguiente.addEventListener('click', avanzarSiguiente);
 btnAnterior.addEventListener('click', retrocederAnterior);
 
 btnFavorito.addEventListener('click', () => {
@@ -410,6 +556,12 @@ barraVolumen.addEventListener('input', () => {
   player.setVolume(Number(barraVolumen.value));
 });
 
-// ---------- Inicio ----------
-renderizarChipsRecientes();
-mostrarPestana('resultados');
+// ==================== Inicio ====================
+
+async function iniciar() {
+  await Promise.all([cargarFavoritosInicial(), cargarRecientesInicial(), cargarHistorialInicial()]);
+  renderizarChipsRecientes();
+  mostrarPestana('resultados');
+}
+
+iniciar();

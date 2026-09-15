@@ -529,3 +529,150 @@ html, body {
     height: min(160px, 30vh);
   }
 }
+
+/* ---------- Páginas de autenticación (login / registro) ---------- */
+
+.pantalla-auth {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.tarjeta-auth {
+  width: 100%;
+  max-width: 380px;
+  background: var(--panel);
+  border: 1px solid var(--borde);
+  border-radius: 16px;
+  padding: 32px 28px;
+}
+
+.marca-auth {
+  margin-bottom: 20px;
+  justify-content: center;
+}
+
+.titulo-auth {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 22px;
+  margin: 0 0 6px;
+  text-align: center;
+}
+
+.subtitulo-auth {
+  color: var(--texto-tenue);
+  font-size: 13.5px;
+  text-align: center;
+  margin: 0 0 22px;
+  line-height: 1.5;
+}
+
+.form-auth {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-auth label {
+  font-size: 13px;
+  color: var(--texto-tenue);
+  margin-top: 10px;
+}
+
+.form-auth input {
+  background: var(--panel-alto);
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--texto);
+  font-family: 'Work Sans', sans-serif;
+  font-size: 14px;
+  outline: none;
+}
+
+.form-auth input:focus {
+  border-color: var(--oro);
+}
+
+.form-auth input:invalid:not(:placeholder-shown) {
+  border-color: #E0554F;
+}
+
+.ayuda-campo {
+  font-size: 11.5px;
+  color: var(--texto-tenue);
+  margin-top: -2px;
+}
+
+.btn-auth {
+  margin-top: 18px;
+  background: var(--oro);
+  color: var(--tinta);
+  border: none;
+  border-radius: 8px;
+  padding: 11px;
+  font-family: 'Work Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-auth:hover {
+  filter: brightness(1.08);
+}
+
+.mensaje-error {
+  background: rgba(224, 85, 79, 0.12);
+  border: 1px solid rgba(224, 85, 79, 0.4);
+  color: #E0554F;
+  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+
+.pie-auth {
+  text-align: center;
+  font-size: 13px;
+  color: var(--texto-tenue);
+  margin: 14px 0 0;
+}
+
+.pie-auth a {
+  color: var(--oro);
+  text-decoration: none;
+}
+
+.pie-auth a:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Barra de cuenta dentro de la app ---------- */
+
+.barra-cuenta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+  color: var(--texto-tenue);
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--borde);
+}
+
+.barra-cuenta a {
+  color: var(--oro);
+  text-decoration: none;
+}
+
+.barra-cuenta a:hover {
+  text-decoration: underline;
+}
+
+.barra-cuenta .separador {
+  color: var(--borde);
+  margin: 0 6px;
+}
