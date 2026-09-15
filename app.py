@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 
 from flask import Flask, jsonify, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import IntegrityError
 from flask_login import (
     LoginManager, UserMixin, login_user, logout_user,
     login_required, current_user,
@@ -194,7 +195,18 @@ def registro():
         usuario = Usuario(nombre_usuario=nombre_usuario, email=email)
         usuario.establecer_password(password)
         db.session.add(usuario)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            # Puede pasar si dos registros con el mismo correo/usuario
+            # llegaron casi al mismo tiempo (ej. desde dos dispositivos).
+            db.session.rollback()
+            return render_template(
+                "registro.html",
+                error="Ese nombre de usuario o correo ya está en uso.",
+                nombre_usuario=nombre_usuario,
+                email=email,
+            )
         login_user(usuario)
         return redirect(url_for("home"))
 
