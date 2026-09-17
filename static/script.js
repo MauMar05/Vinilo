@@ -3,6 +3,7 @@ let player = null;
 let playerListo = false;
 let videoActualId = null;
 let cancionPendiente = null;
+let timeoutCargaReproductor = null;
 let intervaloProgreso = null;
 
 let listaReproduccion = [];
@@ -34,6 +35,7 @@ window.onYouTubeIframeAPIReady = function () {
     events: {
       onReady: () => {
         playerListo = true;
+        clearTimeout(timeoutCargaReproductor);
         if (cancionPendiente) {
           const { cancion, lista, indice } = cancionPendiente;
           cancionPendiente = null;
@@ -467,13 +469,22 @@ function reproducirCancion(cancion, lista, indice) {
   if (!playerListo) {
     cancionPendiente = { cancion, lista, indice };
     estadoBusqueda.textContent = 'Cargando el reproductor, ya casi empieza…';
+
+    clearTimeout(timeoutCargaReproductor);
+    timeoutCargaReproductor = setTimeout(() => {
+      if (!playerListo) {
+        estadoBusqueda.innerHTML = 'El reproductor está tardando más de lo normal en cargar (puede ser tu conexión). <button type="button" id="btn-reintentar" style="color:#D9A441; background:none; border:none; text-decoration:underline; cursor:pointer; font:inherit; padding:0;">Reintentar</button>';
+        const boton = document.getElementById('btn-reintentar');
+        if (boton) boton.addEventListener('click', () => window.location.reload());
+      }
+    }, 6000);
     return;
   }
 
   listaReproduccion = lista || [cancion];
   indiceActual = typeof indice === 'number' ? indice : 0;
 
-   videoActualId = cancion.id;
+  videoActualId = cancion.id;
   vacio.style.display = 'none';
   reproductor.classList.remove('oculto');
   document.body.classList.add('hay-reproduccion');

@@ -32,15 +32,12 @@ html, body {
 /* ---------- Panel de búsqueda ---------- */
 
 .panel-buscar {
-  border-right: none;
-  border-bottom: 1px solid var(--borde);
-  padding: 18px 16px;
-  max-height: 72vh;
-  transition: max-height 0.25s ease;
-}
-
-body.hay-reproduccion .panel-buscar {
-  max-height: 34vh;
+  background: var(--panel);
+  border-right: 1px solid var(--borde);
+  padding: 28px 22px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .marca {
@@ -469,7 +466,11 @@ body.hay-reproduccion .panel-buscar {
     border-right: none;
     border-bottom: 1px solid var(--borde);
     padding: 18px 16px;
-    max-height: 45vh;
+    max-height: 72vh;
+  }
+
+  body.hay-reproduccion .panel-buscar {
+    max-height: 34vh;
   }
 
   .marca {
