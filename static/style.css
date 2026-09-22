@@ -513,6 +513,12 @@ html, body {
     flex: 1;
     width: auto;
   }
+
+  .barra-cuenta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
 }
 
 @media (max-width: 768px) and (max-height: 480px) {
